@@ -1,13 +1,17 @@
-# 第一部分: Chisel 学习 & XiangShan 仓库介绍
+# 面向对象程序设计代码分析报告: XiangShan 南湖架构前端模块阅读 (以 BPU 为中心)
+
+---
+
+## 前言
 
 **工欲善其事, 必先利其器.** 在准备系统阅读 XiangShan 仓库的一部分之前, 笔者先对其使用的硬件构造语言 **Chisel** 做了一定程度的学习. 虽然笔者上手所做第一件事其实还是略览仓库介绍与强行阅读源代码 (为对结构的了解, 并不十分需要对代码实际含义的理解), 但为读者的方便, 在源码阅读报告的第一部分中, 笔者觉得应当先介绍一下 Chisel (其实, 主要是为了方便笔者对 Chisel 学习的自我监督与记录). 在第1.5节, 笔者会尝试解答任务中的三个问题, 若读者对前面的长篇大论无兴趣, 可以直接跳转至那里.
 
-![Chisel Logo](./images/chisel_logo.svg)
+---
 
-![XiangShan Logo](./images/LOGO.webp)
 ## 目录
 
-- [第一部分: Chisel 学习 \& XiangShan 仓库介绍](#第一部分-chisel-学习--xiangshan-仓库介绍)
+- [面向对象程序设计代码分析报告: XiangShan 南湖架构前端模块阅读 (以 BPU 为中心)](#面向对象程序设计代码分析报告-xiangshan-南湖架构前端模块阅读-以-bpu-为中心)
+  - [前言](#前言)
   - [目录](#目录)
   - [1.1 Chisel 简介](#11-chisel-简介)
   - [1.2 Scala 基础语法](#12-scala-基础语法)
@@ -31,8 +35,19 @@
     - [1.5.1 XiangShan 项目的主要功能和流程](#151-xiangshan-项目的主要功能和流程)
     - [1.5.2 XiangShan 包含的主要功能模块](#152-xiangshan-包含的主要功能模块)
     - [1.5.3 笔者选择分析的功能模块](#153-笔者选择分析的功能模块)
+  - [2.1 从 XiangShan 的作者们对 Chisel 的使用说起](#21-从-xiangshan-的作者们对-chisel-的使用说起)
+  - [2.2 SiFive 和开源拓展库 Diplomacy](#22-sifive-和开源拓展库-diplomacy)
+    - [2.2.1 自熟悉处向上的探索](#221-自熟悉处向上的探索)
+    - [2.2.2 UCB, RISC-V, Chisel, SiFive, Rocket Chip](#222-ucb-risc-v-chisel-sifive-rocket-chip)
+    - [2.2.3 Diplomacy, LazyModule 与 LazyModuleImp](#223-diplomacy-lazymodule-与-lazymoduleimp)
+  - [2.3 BPU 的结构组成](#23-bpu-的结构组成)
+    - [2.3.1 uBTB (micro Branch Target Buffer)](#231-ubtb-micro-branch-target-buffer)
+    - [2.3.2 FakePredictor](#232-fakepredictor)
+    - [2.3.3 FTB (Fetch Target Buffer)](#233-ftb-fetch-target-buffer)
 
--------------------------
+---
+
+![Chisel Logo](./images/chisel_logo.svg)
 
 ## 1.1 Chisel 简介
 
@@ -1010,7 +1025,7 @@ def getSmallBoats(seq: Seq[Boat]): Seq[Boat] = seq.filter { b =>
 
 ### 1.5.1 XiangShan 项目的主要功能和流程
 
-> 所以，团队的唐丹博士和我一直认为要建立一个像Linux那样的开源RISC-V核主线，既能被工业界广泛应用，又能支持学术界试验创新想法。最关键的是，一定要让它像Linux那样至少存活30年！ [^XiangShan-intro-zhihu]
+> 所以, 团队的唐丹博士和我一直认为要建立一个像Linux那样的开源RISC-V核主线, 既能被工业界广泛应用, 又能支持学术界试验创新想法. 最关键的是, 一定要让它像Linux那样至少存活30年！ [^XiangShan-intro-zhihu]
 
 香山是一个高性能开源 RISC-V 处理器项目.
 
@@ -1018,14 +1033,14 @@ def getSmallBoats(seq: Seq[Boat]): Seq[Boat] = seq.filter { b =>
 - 开源, 意味着源代码对任何人的开放性, 所有人都可以拿香山的代码流片, 所有人都可以使用它的代码进行使用或更改.
 - RISC-V, 是一个开源开放的指令集, 有短小精悍的优点, 也有拓展与兼容方面的不足. 香山项目的目标是在 RISC-V 这个允许任何人免费实现 CPU 的指令集上, 实现一个能为工业界和学术界广泛使用的开源处理器核.
 
-> 自 2020 年 6 月开始开发的雁栖湖为香山处理器的首个稳定的微架构。  
-> 香山的第二代微架构被命名为南湖。  
-> 香山的第三代微架构（昆明湖）正在 master 分支上不断开发中。[^XiangShan-intro-zh]
+> 自 2020 年 6 月开始开发的雁栖湖为香山处理器的首个稳定的微架构.   
+> 香山的第二代微架构被命名为南湖.   
+> 香山的第三代微架构（昆明湖）正在 master 分支上不断开发中. [^XiangShan-intro-zh]
 
 本文中, 笔者将主要阅读香山仓库南湖架构版本的 RTL 代码, 可能会辅以对 master 分支的部分新增功能的阅读.
 
-> 它的架构代号以湖命名。第一版架构代号是“雁栖湖”，这是带有浓重国科大情节的同学们起的名字，因为他们研一都在怀柔雁栖湖待了一年。“雁栖湖”RTL代码于2021年4月完成，计划于7月基于28nm工艺流片，目前频率为1.3GHz。  
-> 第二版架构代号是“南湖”，这是向建党100周年致敬。“南湖”计划在今年年底[^今年年底]流片，将采用14nm工艺，目标频率是2GHz。[^XiangShan-intro-zhihu]
+> 它的架构代号以湖命名. 第一版架构代号是“雁栖湖”, 这是带有浓重国科大情节的同学们起的名字, 因为他们研一都在怀柔雁栖湖待了一年. “雁栖湖”RTL代码于2021年4月完成, 计划于7月基于28nm工艺流片, 目前频率为1.3GHz.   
+> 第二版架构代号是“南湖”, 这是向建党100周年致敬. “南湖”计划在今年年底[^今年年底]流片, 将采用14nm工艺, 目标频率是2GHz. [^XiangShan-intro-zhihu]
 
 ### 1.5.2 XiangShan 包含的主要功能模块
 
@@ -1038,17 +1053,17 @@ def getSmallBoats(seq: Seq[Boat]): Seq[Boat] = seq.filter { b =>
 > 香山的仿真环境：
 >
 > - **[Difftest](https://github.com/OpenXiangShan/difftest/)**：香山使用的处理器协同仿真框架
-> - **[NEMU](https://github.com/OpenXiangShan/NEMU/tree/master)**：一个效率接近 QEMU 的高性能 ISA 解释器，这里有一个介绍视频
-> - **[nexus-am](https://github.com/OpenXiangShan/nexus-am)**：Abstract Machine，提供程序的运行时环境，这里有一个简单的介绍
-> - **[DRAMsim3](https://github.com/OpenXiangShan/DRAMsim3)**：Cycle-level 地模拟内存的行为，针对香山项目进行了配置
-> - **[env-scripts](https://github.com/OpenXiangShan/env-scripts)**：一些脚本文件，包括性能分析、模块替换和时序分析等
+> - **[NEMU](https://github.com/OpenXiangShan/NEMU/tree/master)**：一个效率接近 QEMU 的高性能 ISA 解释器, 这里有一个介绍视频
+> - **[nexus-am](https://github.com/OpenXiangShan/nexus-am)**：Abstract Machine, 提供程序的运行时环境, 这里有一个简单的介绍
+> - **[DRAMsim3](https://github.com/OpenXiangShan/DRAMsim3)**：Cycle-level 地模拟内存的行为, 针对香山项目进行了配置
+> - **[env-scripts](https://github.com/OpenXiangShan/env-scripts)**：一些脚本文件, 包括性能分析、模块替换和时序分析等
 > - **[xs-env](https://github.com/OpenXiangShan/xs-env)**：香山处理器前端开发环境部署脚本
 >
 > 香山的文档：
 >
-> - **[XiangShan-doc](https://github.com/OpenXiangShan/XiangShan-doc)**：香山处理器文档，包括设计文档、公开报告以及对错误新闻的澄清
+> - **[XiangShan-doc](https://github.com/OpenXiangShan/XiangShan-doc)**：香山处理器文档, 包括设计文档、公开报告以及对错误新闻的澄清
 >
-> 香山项目下的其他仓库还包括 **riscv-linux** ，**riscv-pk** ，**riscv-torture** 等等。[^香山官方文档-项目导引]
+> 香山项目下的其他仓库还包括 **riscv-linux** , **riscv-pk** , **riscv-torture** 等等. [^香山官方文档-项目导引]
 
 由于与本课程的主题无关, 笔者在此不详细介绍每个模块的功能, 仅对香山的 RTL 代码做一些介绍. ~~香山团队很可爱, 好多命名都用的汉语拼音, 似乎是刻意而为之.~~ 先搬运一下香山官方文档中对目录结构的介绍:
 
@@ -1067,7 +1082,7 @@ def getSmallBoats(seq: Seq[Boat]): Seq[Boat] = seq.filter { b =>
 ├── fudian               # 香山浮点子模块
 ├── huancun              # 香山 L2/L3 缓存子模块
 ├── difftest             # 香山协同仿真框架
-├── ready-to-run         # 预先编译好的 nemu 动态链接库，和一些负载
+├── ready-to-run         # 预先编译好的 nemu 动态链接库, 和一些负载
 └── rocket-chip          # 用来获取 Diplomacy 框架（等待上游拆分）
 ```
 
@@ -1089,7 +1104,7 @@ xiangshan
 
 ### 1.5.3 笔者选择分析的功能模块
 
-香山的雁栖湖架构中, `frontend` 文件夹下的目录结构如下:
+笔者主要考察 xiangshan2.0 这个稳定版本的代码进行阅读. 香山的雁栖湖架构中, `frontend` 文件夹下的目录结构如下:
 
 ```bash
 frontend
@@ -1120,12 +1135,663 @@ frontend
 └── WrBypass.scala
 ```
 
-虽然 `BPU.scala` 只是其中的一个文件, 但它其实并非整个分支预测器的全部. 诸如 `RAS.scala`, `FTB.scala`, `Tage.scala`, `SC.scala`, `ITTAGE.scala` 等等, 都是小的分支预测器, 是整个分支预测单元的一部分. 本文中, 笔者将以**面向对象**为切入点, 对此间的 BPU 模块进行分析.
+虽然 `BPU.scala` 只是其中的一个文件, 但它其实并非整个分支预测器的全部. 诸如 `RAS.scala`, `FTB.scala`, `Tage.scala`, `SC.scala`, `ITTAGE.scala` 等等, 都是小的分支预测器, 是整个分支预测单元的一部分. 本文中, 笔者将以**面向对象**为切入点, 从 BPU 模块入手, 对前端模块的一些内容进行分析.
 
-> 分支预测单元采用一种多级混合预测的架构，其主要组成部分包括**下一行预测器**（Next Line Predictor，以下简称 NLP）和**精确预测器**（Accurate Predictor，以下简称 APD）。其中，NLP 是一个 uBTB (micro BTB)，APD 由 FTB1、TAGE-SC、ITTAGE、RAS 组成。NLP 提供无空泡的预测，在预测请求的下一拍就可以得到预测结果。APD 各组成部分的延迟在 2~3 拍之间。其中，FTB、TAGE、RAS 的延迟为 2 拍；SC、ITTAGE 的延迟为 3 拍。一次预测会经历三个流水级，每一个流水级都会产生新的预测内容。这些分布于不同流水级的预测器组成了一个**覆盖预测器** (overriding predictor)。  
-> 除了是否和取指单元解耦之外，南湖架构和上一代（雁栖湖）架构分支预测器的最大区别在于预测块的定义方式。南湖架构中，BTB 被替换成了 FTB (Fetch Target Buffer)，每一个 FTB 项都形成一个预测块，我们不仅对下一个块的起始地址做预测，同时也对当前块的结束点做预测。详见 FTB 一节。[^香山官方文档-分支预测]
+> 分支预测单元采用一种多级混合预测的架构, 其主要组成部分包括**下一行预测器**（Next Line Predictor, 以下简称 NLP）和**精确预测器**（Accurate Predictor, 以下简称 APD）. 其中, NLP 是一个 uBTB (micro BTB), APD 由 FTB1、TAGE-SC、ITTAGE、RAS 组成. NLP 提供无空泡的预测, 在预测请求的下一拍就可以得到预测结果. APD 各组成部分的延迟在 2~3 拍之间. 其中, FTB、TAGE、RAS 的延迟为 2 拍；SC、ITTAGE 的延迟为 3 拍. 一次预测会经历三个流水级, 每一个流水级都会产生新的预测内容. 这些分布于不同流水级的预测器组成了一个**覆盖预测器** (overriding predictor).  
+> 除了是否和取指单元解耦之外, 南湖架构和上一代（雁栖湖）架构分支预测器的最大区别在于预测块的定义方式. 南湖架构中, BTB 被替换成了 FTB (Fetch Target Buffer), 每一个 FTB 项都形成一个预测块, 我们不仅对下一个块的起始地址做预测, 同时也对当前块的结束点做预测. 详见 FTB 一节. [^香山官方文档-分支预测]
 
 正是因为它多个预测器并列的复杂结构, 使得我猜想: 这个模块一定最能体现 Chisel 的面向对象思想! ~~当然, 这也是我最想了解的部分.~~ ~~如若不然, 按照王老师上课所讲述, 应当问问代码作者为什么没用好 Chisel.~~
+
+---
+
+![XiangShan Logo](./images/LOGO.webp)
+
+这篇报告我不想走寻常路, 非要针对 BPU 一个模块逮着就薅羊毛, 硬是要介绍完它的所有; 相反, 我打算先从自己代码阅读的一处历程讲起. 希望读者在阅读此篇报告时, 发现笔者的行文逻辑与报告的顺序建议不同, 实际上是在一片漆黑中的**一场没有终点的探险**. 或者说, 这就是**实践指导理论**吧.
+
+---
+
+## 2.1 从 XiangShan 的作者们对 Chisel 的使用说起
+
+在文件夹 `src/main/scala/xiangshan/frontend/` 中, 有一个文件的名字十分醒目: `BPU.scala`; 这个文件一看就像是分支预测单元的主文件, 于是我从它开始阅读的旅途. 某位香山开发团队的学长告诉我可以使用 VScode 的 Scala (Metals) 插件来阅读 Chisel 的代码, 我于是就开始尝试使用. 这个插件能展现出文件内部的 Outline 视图, 而在此之中, 我看到了一个似乎很重要的名词: `Predictor`
+
+<!-- 插入一张图片 -->
+![BPU.scala 的 Outline 视图](./images/bpu_outline.png)
+
+什么是 Predictor 呢? 难道不就是整个 BPU 的主体吗? 于是我就点进去看了一下. 这一年编写 Verilog 的经验告诉我, 阅读一个硬件相关语言的一个部件之前, 首先要看一看它的代码有多长, 如果代码很长, 那多半其中有大而冗杂的判断语句. 这段代码的大体结构是这样的:
+
+```scala
+@chiselName
+class Predictor(implicit p: Parameters) extends XSModule with HasBPUConst with HasPerfEvents with HasCircularQueuePtrHelper {
+  val io = IO(new PredictorIO)
+
+  val ctrl = DelayN(io.ctrl, 1)
+  val predictors = Module(if (useBPD) new Composer else new FakePredictor)
+
+  // ctrl signal
+  predictors.io.ctrl := ctrl
+
+  /* 此处省略二百余行代码 */
+
+  class PreviousPredInfo extends Bundle {
+    val target = UInt(VAddrBits.W)
+    val lastBrPosOH = UInt((numBr+1).W)
+    val taken = Bool()
+    val cfiIndex = UInt(log2Ceil(PredictWidth).W)
+  }
+
+  def preds_needs_redirect_vec_dup(x: Seq[PreviousPredInfo], y: BranchPredictionBundle) = {
+    val target_diff = x.zip(y.target).map {case (t1, t2) => t1.target =/= t2 }
+    val lastBrPosOH_diff = x.zip(y.lastBrPosOH).map {case (oh1, oh2) => oh1.lastBrPosOH.asUInt =/= oh2.asUInt}
+    val taken_diff = x.zip(y.taken).map {case (t1, t2) => t1.taken =/= t2}
+    val takenOffset_diff = x.zip(y.cfiIndex).map {case (i1, i2) => i1.cfiIndex =/= i2.bits}
+    VecInit(
+      for (tgtd & lbpohd & tkd & tod <-
+        target_diff zip lastBrPosOH_diff zip taken_diff zip takenOffset_diff)
+        yield VecInit(tgtd, lbpohd, tkd, tod)
+    )
+  }
+  /* 此处省略二/三十行代码 */
+  val s1_pred_info = dup_wire(new PreviousPredInfo)
+
+  /* 此处省略二百余行代码 */
+
+  XSError(isBefore(redirect_dup(0).cfiUpdate.histPtr, s3_ghist_ptr_dup(0)) && do_redirect_dup(0).valid,
+    p"s3_ghist_ptr ${s3_ghist_ptr_dup(0)} exceeds redirect histPtr ${redirect_dup(0).cfiUpdate.histPtr}\n")
+  /* 此处省略二/三十行代码 */
+  XSPerfAccumulate("s1_not_valid", !s1_valid_dup(0))
+
+  val perfEvents = predictors.asInstanceOf[Composer].getPerfEvents
+  generatePerfEvent()
+}
+```
+
+首先吐槽一下, 香山在短短一个文件中一个类定义所用的五百五十行代码中, 同样是给生成线路用的 `val` 常量, 有的名称用下划线命名法, 有的用小驼峰命名法, 名称已经不统一了. 最关键的是, 还有驼峰命名法后面再加下划线的用法.
+
+其次, 代码的抽象工作做得不是很好. 在这个巨大无比的类当中, 定义了两个方法; 其中一个 (`def getHist(ptr: CGHPtr): UInt`) 复用了很多次, 另一个 (就是上文代码中的 `preds_needs_redirect_vec_dup`) 并没有进行复用, 只是单调地被使用了一次, 大概这样:
+
+```scala
+  def preds_needs_redirect_vec_dup(x: Seq[PreviousPredInfo], y: BranchPredictionBundle) = {
+    val target_diff = x.zip(y.target).map {case (t1, t2) => t1.target =/= t2 }
+    val lastBrPosOH_diff = x.zip(y.lastBrPosOH).map {case (oh1, oh2) => oh1.lastBrPosOH.asUInt =/= oh2.asUInt}
+    val taken_diff = x.zip(y.taken).map {case (t1, t2) => t1.taken =/= t2}
+    val takenOffset_diff = x.zip(y.cfiIndex).map {case (i1, i2) => i1.cfiIndex =/= i2.bits}
+    VecInit(
+      for (tgtd & lbpohd & tkd & tod <-
+        target_diff zip lastBrPosOH_diff zip taken_diff zip takenOffset_diff)
+        yield VecInit(tgtd, lbpohd, tkd, tod)
+    )
+  }
+
+  /* 此处省略一些代码 */
+
+  val previous_s1_pred_info = RegEnable(s1_pred_info, init=0.U.asTypeOf(s1_pred_info), s1_fire_dup(0))
+
+  val s2_redirect_s1_last_pred_vec_dup = preds_needs_redirect_vec_dup(previous_s1_pred_info, resp.s2)
+
+  for (s2_redirect & s2_fire & s2_redirect_s1_last_pred_vec <- s2_redirect_dup zip s2_fire_dup zip s2_redirect_s1_last_pred_vec_dup)
+    s2_redirect := s2_fire && s2_redirect_s1_last_pred_vec.reduce(_||_)
+
+  for (npcGen & s2_redirect & s2_target <- npcGen_dup zip s2_redirect_dup zip resp.s2.target)
+    npcGen.register(s2_redirect, s2_target, Some("s2_target"), 5)
+  for (foldedGhGen & s2_redirect & s2_predicted_fh <- foldedGhGen_dup zip s2_redirect_dup zip s2_predicted_fh_dup)
+    foldedGhGen.register(s2_redirect, s2_predicted_fh, Some("s2_FGH"), 5)
+  for (ghistPtrGen & s2_redirect & s2_predicted_ghist_ptr <- ghistPtrGen_dup zip s2_redirect_dup zip s2_predicted_ghist_ptr_dup)
+    ghistPtrGen.register(s2_redirect, s2_predicted_ghist_ptr, Some("s2_GHPtr"), 5)
+  for (lastBrNumOHGen & s2_redirect & s2_brPosOH <- lastBrNumOHGen_dup zip s2_redirect_dup zip resp.s2.lastBrPosOH.map(_.asUInt))
+    lastBrNumOHGen.register(s2_redirect, s2_brPosOH, Some("s2_BrNumOH"), 5)
+  for (aheadFhObGen & s2_redirect & s2_ahead_fh_ob_src <- aheadFhObGen_dup zip s2_redirect_dup zip s2_ahead_fh_ob_src_dup)
+    aheadFhObGen.register(s2_redirect, s2_ahead_fh_ob_src, Some("s2_AFHOB"), 5)
+  ghvBitWriteGens.zip(s2_ghv_wens).zipWithIndex.map{case ((b, w), i) =>
+    b.register(w.reduce(_||_), s2_ghv_wdatas(i), Some(s"s2_new_bit_$i"), 5)
+  }
+```
+
+对这只有唯一一次的函数调用, 我不禁感到疑惑: 为什么单单只将这一点点的代码打包成一个函数呢? 要么多打包几层函数, 不断做调用, 要么直接一条道走到黑, 反正这是硬件电路的语言, 和软件不同, 很难有 "程序集中在部分可复用代码上" 这么一回事, 大量列出代码不一定会影响可读性.
+
+顺带一提, 此处的 Scala 原生方法使用中, 大量的 `zip` 被单独使用 (即省略`.`和`()`, 直接使用 `zip` 调用对应方法). 这符合之前我们提到的 Scala 的运算符的使用原理. 不过, 这一段也可以看出, 在香山的团队当中, 有的人喜欢这么写, 有的人并不.
+
+再次, 注释很重要, 但是很可惜, 香山的源代码的注释肉眼可见地少.
+
+![香山frontend文件夹中的注释数量](./images/comment_in_frontend.png)
+
+整个前端部分, 在我往里随便写了几十行注释之后, 也才只有不到一千个 `//` 的注释符号啊! 更何况其中还有很多是被注释掉的代码, 而非真正有效的注释; 还有很多注释基本没用.
+
+不得不感叹, 搞软件工程的人, 绝对会认为香山的代码很丑陋. 此时的我开始感叹, 怎么当时没选择 rocket chip 来阅读, 而是读了香山这个东西呢? 遂打开前者的仓库, 简单一看: 嚯, 也有一样的问题啊!
+
+```scala
+
+    val s2_base_pc = ~(~s2_pc | (fetchBytes-1).U)
+    val taken_idx = Wire(UInt())
+    val after_idx = Wire(UInt())
+    val useRAS = WireDefault(false.B)
+    val updateBTB = WireDefault(false.B)
+
+    // If !prevTaken, ras_update / bht_update is always invalid. 
+    taken_idx := DontCare
+    after_idx := DontCare
+
+    def scanInsns(idx: Int, prevValid: Bool, prevBits: UInt, prevTaken: Bool): Bool = {
+      def insnIsRVC(bits: UInt) = bits(1,0) =/= 3.U
+      val prevRVI = prevValid && !insnIsRVC(prevBits)
+      val valid = fq.io.enq.bits.mask(idx) && !prevRVI
+      val bits = fq.io.enq.bits.data(coreInstBits*(idx+1)-1, coreInstBits*idx)
+      val rvc = insnIsRVC(bits)
+
+      //  ... 
+```
+
+注释不多, 变量名也不统一 (虽然这个idx和香山那里一样, 都可以理解) 后不再表. 言归 `Predictor` 的模块例化. 作为整个分支预测单元的 "最顶层" 模块 (类), 它又是在哪里被例化的呢?
+
+## 2.2 SiFive 和开源拓展库 Diplomacy
+
+### 2.2.1 自熟悉处向上的探索
+
+搜索后发现了这一处地方:
+
+```scala
+class Frontend()(implicit p: Parameters) extends LazyModule with HasXSParameter{
+
+  val instrUncache  = LazyModule(new InstrUncache())
+  val icache        = LazyModule(new ICache())
+
+  lazy val module = new FrontendImp(this)
+}
+
+
+class FrontendImp (outer: Frontend) extends LazyModuleImp(outer)
+  with HasXSParameter
+  with HasPerfEvents
+{
+  val io = IO(new Bundle() {
+    val hartId = Input(UInt(8.W))
+    val reset_vector = Input(UInt(PAddrBits.W))
+    val fencei = Input(Bool())
+    val ptw = new TlbPtwIO(6)
+    val backend = new FrontendToCtrlIO // frontend to ctrl
+    /* 此处省略一些代码 */
+  })
+
+  //decouped-frontend modules
+  val instrUncache = outer.instrUncache.module
+  val icache       = outer.icache.module // instruction cache
+  val bpu     = Module(new Predictor) // branch prediction unit
+  val ifu     = Module(new NewIFU) // instruction fetch unit
+  val ibuffer =  Module(new Ibuffer) // instruction buffer
+  val ftq = Module(new Ftq) // fetch target queue
+
+  val tlbCsr = DelayN(io.tlbCsr, 2)
+  val csrCtrl = DelayN(io.csrCtrl, 2)
+  val sfence = RegNext(RegNext(io.sfence))
+
+  /* 此处省略一些代码 */
+
+}
+```
+
+简单做出分析后, 我们可以得知:
+
+- `Frontend` 是前端部分的顶层模块, "看起来" 实例化了 `InstrUncache`, `ICache`, `FrontendImp` 等等模块;
+  - `InstrUncache` ~~是一个奇特的模块~~是用来支持从MMIO设备中读取指令的模块;
+    - 我一开始并没有搞清楚这个英文到底是什么意思, 于是我去搜索, 结果发现香山有一次代码 commit 的 log 里面写着: *Instr uncache: support instruction fecth from MMIO device ( flash )*
+    - MMIO 是 Memory Mapped I/O 的缩写, 意思是内存映射 I/O, 是一种 I/O 设备的通信方式. 在这种情况对应的内存地址空间, 指令访存指向的其实不是内存, 而是 I/O 设备的寄存器; 通过读写这个区域的内容, 就可以和 I/O 设备进行通信. 这个模块的作用, 就是支持从 MMIO 设备中读取指令, 这种指令当然是不需要被指令 Cache 缓存的.
+  - `ICache` 是用来做指令缓存的模块;
+  - `FrontendImp` 是用来做其他的前端实现的类;
+    - 以一整个 `Frontend()` 类的实例, 也就是前端部件的外壳为参数 (可以理解为用于信号线的连接);
+    - 继承了 `LazyModuleImp(outer)` 父类;
+    - 混入了 `HasXSParameter` 与 `HasPerfEvents` 两项特质. 两者是香山项目定义的. 前者用于便利某个类寻找一些 CPU 的参数 (比如 `HasIcache` 代表有指令缓存, `EnableBPU` 代表是否启用了分支预测). 后者提供了几种方法, 用于性能计算.
+
+Scala中的lazy关键字意味着模块的初始化被推迟到第一次访问. 所以理论上, `FrontendImp` 的实例化过程, 会在 Chisel 程序作为 Verilog 的生成器运行到访问它的时候才进行. 但 Chisel 毕竟不是为了长期运行诞生的, 套用 PPT 里的话改编一下, 这叫做 "缺乏持久性要求". 那为什么要加上这个 `lazy` 呢? 之前笔者介绍过 `val io = IO(new xxx(yyy))` 的用法, 那么这里对应位置的 `LazyModule` 和 `LazyModuleImp` 又是什么样的对象呢? 这里留待后话, 笔者当先介绍一下一段题外话.
+
+### 2.2.2 UCB, RISC-V, Chisel, SiFive, Rocket Chip
+
+> SiFive was founded in 2015 by Krste Asanović, Yunsup Lee, and Andrew Waterman, three researchers from the University of California Berkeley.  
+> SiFive 成立于 2015 年, 创始人是来自加州大学伯克利分校 (UCB) 的三位研究人员Krste Asanović, Yunsup Lee, 和 Andrew Waterman.
+
+SiFive 是世界上第一个生产实现 RISC-V ISA (Instruction Set Architecture, 指令集架构) 的公司. SiFive 这个名字也是源自 RISC-V 的五个特性: 简单, 小型, 模块化, 可扩展, 无特权. 这家公司现在的主要产品是出售 RISC-V 内核, 客户自定义 SoC (System on Chip), SoC IP, 以及其他产品; 这意味着他们需要经常和硬件设计打交道.
+
+如在[第1.5.1节](#151-xiangshan-项目的主要功能和流程)所述, RISC-V 是加州大学伯克利分校的一个开源的指令集架构, 这也意味着其基础上的许多硬件层面设计工作都可以被完全公开地面向大众. 在这种情况下, 将传统的 RTL 级硬件描述语言转型升级为更轻便灵活的新型语言, 展现了其意义.
+
+同样是来自 UCB 的 Chisel 搭上了这般便车. SiFive 公司现在在内部使用 Chisel 进行开发, 并形成了一套良好的开发模式, 很好地提升了设计速度与代码简介程度; 他们内部使用 Chisel 进行开发, 但在交付时, 会将其转换为 Verilog 代码, 以便于被服务对象对代码的理解. 如同 Python 的各类第三方库, 他们也在不断地通过新增第三方库的方式, 向 Chisel 的框架中填入各种各样的功能, 以满足生产需求.
+
+传统的硬件设计方式 (如以 Verilog 和 VHDL 为代表的硬件描述语言) 维护 SoC 不同模块之间的参数/信号十分复杂. 以~~隔壁体系结构研讨课的~~ Verilog 代码为例:
+
+```verilog
+module mycpu_top (
+  input  wire        aclk,
+  input  wire        aresetn,
+  // cpu_axi interface for upper module
+  output wire [ 3:0] arid,
+  output wire [31:0] araddr,
+  output wire [ 7:0] arlen,
+  output wire [ 2:0] arsize,
+  output wire [ 1:0] arburst,
+  output wire [ 1:0] arlock,
+  output wire [ 3:0] arcache,
+  output wire [ 2:0] arprot,
+  output wire        arvalid,
+  input  wire        arready,
+
+  input  wire [ 3:0] rid,
+  input  wire [31:0] rdata,
+  input  wire [ 1:0] rresp,
+  input  wire        rlast,
+  input  wire        rvalid,
+  output wire        rready,
+
+  output wire [ 3:0] awid,
+  output wire [31:0] awaddr,
+  output wire [ 7:0] awlen,
+  output wire [ 2:0] awsize,
+  output wire [ 1:0] awburst,
+  output wire [ 1:0] awlock,
+  output wire [ 3:0] awcache,
+  output wire [ 2:0] awprot,
+  output wire        awvalid,
+  input  wire        awready,
+
+  output wire [ 3:0] wid,
+  output wire [31:0] wdata,
+  output wire [ 3:0] wstrb,
+  output wire        wlast,
+  output wire        wvalid,
+  input  wire        wready,
+
+  input  wire [ 3:0] bid,
+  input  wire [ 1:0] bresp,
+  input  wire        bvalid,
+  output wire        bready,
+  // trace debug interface
+  output wire [31:0] debug_wb_pc,
+  output wire [ 3:0] debug_wb_rf_we,
+  output wire [ 4:0] debug_wb_rf_wnum,
+  output wire [31:0] debug_wb_rf_wdata
+);
+```
+
+只是一个简单的 AXI 总线协议的信号接口, 就需要如此多且重复无用的代码来实现, 显得很得不偿失. 我们能不能利用面向对象的思想, 将这些复杂的内容包装在同一个类中, 以便于复用呢?
+
+Diplomacy, 就是这样诞生的一种协商框架. Rocket Chip 是一个 SoC 生成器, 最初由加州大学伯克利分校开发, 现在主要由 SiFive 维护. Rocket Chip 的开发团队推出了一种新的 Scala 运行时参数协商和生成机制 Diplomacy, 该机制被实现并封装到 Chisel 包中, 充分利用了 Chisel (Scala) 提供的软件工程功能, 包括函数编程 / 泛型类型推理和面向对象编程. [^lowrisc-intro-of-diplomacy]
+
+~~Chisel 身边开源的世界好像都围绕着 UCB 啊.~~
+
+### 2.2.3 Diplomacy, LazyModule 与 LazyModuleImp
+
+说归上文. Diplomacy, 在中文里是外交的意思, 而在 Chisel 里, 是不同模块之间的 "外交协议". 以前面的 `Frontend` 类中部分代码为例:
+
+```scala
+  val instrUncache  = LazyModule(new InstrUncache())
+  val icache        = LazyModule(new ICache())
+```
+
+Diplomacy 用一个 "很懒的模块 (LazyModule)" 来包装了 `InstrUncache` 和 `ICache` 这两个模块. `LazyModule` 是一个抽象类, 用于定义硬件模块. 它提供了创建模块, 连接模块以及生成模块的 `LazyModuleImp` 的功能. `LazyModule` 允许使用者以层次化的方式组织和构建复杂的硬件模块, 用户可以通过继承它创建自定义硬件模块, 并与其他模块相互连接.
+
+`LazyModule` 是不包括模块具体实现方法的. Diplomacy 同时还提供了 `LazyModuleImp` 这个类, 用于将模块的内部内容封装起来, 以和外界可见的部分分开. 这个 "很懒的模块" 的实现 (Implementation), 就像是一个国家的内政部, 主管模块内部事务 (模块功能的实现), 执行好自己的本职工作 (尽量减少模块与外界的沟通, 保持其高内聚性), 与外界的交流都是通过外交部 (Diplomacy) 进行的. 不妨在这里看一眼其间涉及到的另一个 `LazyModule` 的子类 `InstrUncache` 的实现:
+
+```scala
+class InstrUncache()(implicit p: Parameters) extends LazyModule with HasICacheParameters {
+
+  val clientParameters = TLMasterPortParameters.v1(
+    clients = Seq(TLMasterParameters.v1(
+      "InstrUncache",
+      sourceId = IdRange(0, cacheParams.nMMIOs)
+    ))
+  )
+  val clientNode = TLClientNode(Seq(clientParameters))
+
+  lazy val module = new InstrUncacheImp(this)
+
+}
+```
+
+这个类内部就产生了一些其他的对象. 用 `TLMasterPortParameters` 的 `v1` 版本创建了一个 `clientParameters` 对象, 用于描述一个 TL (TileLink) 总线的主端口的参数; `clientNode` 则是一个 Diplomacy 结点. TileLink 是由 SiFive 芯片级总线互连标准, Diplomacy 自然是支持这个协议的. 这样, `InstruUncache` 模块就在我们不知不觉时, 创建好了需要的一系列参数.
+
+## 2.3 BPU 的结构组成
+
+回过头来, 现在也该看看 BPU 内部的结构了. 下文中, 笔者将从具体模块入手, 站在 BPU当中看 BPU 的 "面向对象" 代码逻辑结构, 但忽视一些硬件的细节~~毕竟这并不是这门课的主要内容~~.
+
+准确来说, BPU (Branch Prediction Unit) 是由很多分支预测器 (Branch Predictor) 组成的. 这一节当中, 我们会先对很多不同的分支预测器进行介绍, 然后再将它们~~和另一些没讲的分支预测器~~组合起来, 形成一个完整的 BPU.
+
+回到 `Predictor` 类的定义. 一上来有这一行代码:
+
+```scala
+trait HasBPUConst extends HasXSParameter {
+  ...
+  val useBPD = true
+  ...
+}
+
+@chiselName
+class Predictor(implicit p: Parameters) extends XSModule with HasBPUConst with HasPerfEvents with HasCircularQueuePtrHelper {
+  ...
+  val predictors = Module(if (useBPD) new Composer else new FakePredictor)
+  ...
+}
+```
+
+常量 `useBPD` 为真, 自然就会用 `Module` 的工厂方法传入 `Composer` 这个类的实例作为参数. 这个类的代码如下:
+
+```scala
+@chiselName
+class Composer(implicit p: Parameters) extends BasePredictor with HasBPUConst with HasPerfEvents {
+  val (components, resp) = getBPDComponents(io.in.bits.resp_in(0), p)
+  ...
+}
+...
+trait HasXSParameter {
+  ...
+  val coreParams = p(XSCoreParamsKey)
+  def getBPDComponents(resp_in: BranchPredictionResp, p: Parameters) = {
+    coreParams.branchPredictor(resp_in, p)
+  }
+  ...
+}
+...
+case object XSCoreParamsKey extends Field[XSCoreParameters]
+case class XSCoreParameters
+(
+  ...
+  branchPredictor: Function2[BranchPredictionResp, Parameters, Tuple2[Seq[BasePredictor], BranchPredictionResp]] =
+    ((resp_in: BranchPredictionResp, p: Parameters) => {
+      val ftb = Module(new FTB()(p))
+      val ubtb = Module(new FauFTB()(p))
+      val tage = Module(new Tage_SC()(p))
+      val ras = Module(new RAS()(p))
+      val ittage = Module(new ITTage()(p))
+      val preds = Seq(ubtb, tage, ftb, ittage, ras)
+      ...
+      (preds, ras.io.out)
+    }),
+  ...
+){...}
+```
+
+`Composer` 类混入了特质 `HasBPUConst` (当然其抽象父类 `BasePredictor`也混入了这个特质), 这个特质继承了父特质 `HasXSParameter`. 因此, `Composer` 可以调用其中的 `getBPDComponents` 方法, 以给定参数返回了一个 `coreParams.branchPredictor` 的返回值. 定睛一看, 其返回值是 `(preds, ras.io.out)`. 总之, 这一步获得了分支预测器的组件, 以及 `ras` (Return Adress Stack) 的输出.
+
+### 2.3.1 uBTB (micro Branch Target Buffer)
+
+讲分支预测器的结构, 自然要挑最简单的入手. uBTB (micro BTB) 是香山使用的最简单的一个分支预测器, 它的特色是只需要一个时钟周期就能返回分支预测的结果, 因此属于 NLP (Next Line Predictor ~~不是 Natural Language Process~~). 结构最简单, 速度最快, 但是准确性不够高. 样例类 `XSCoreParameters` 中的 `branchPredictor` 使用了 `FauFTB` 这个类在工厂方法下的例化来生成这个类的 Verilog 代码. 至于为什么要叫 `FauFTB`, 我也不知道, 只知道在~~正在开发的~~第三代的南湖架构代码中, 这个名字已经发生了改变. `FauFTB` 的代码如下:
+
+```scala
+trait FauFTBParams extends HasXSParameter with HasBPUConst {
+  val numWays = 32
+  val tagSize = 16
+
+  val numDup_local = 2
+
+  def special_idx_for_dup = dupForTageSC
+
+  def getTag(pc: UInt) = pc(tagSize+instOffsetBits-1, instOffsetBits)
+}
+
+class FauFTB(implicit p: Parameters) extends BasePredictor with FauFTBParams {
+  
+  class FauFTBMeta(implicit p: Parameters) extends XSBundle with FauFTBParams {
+    ...
+  }
+  val resp_meta = Wire(new FauFTBMeta)
+  ...
+  class FauFTBBank(implicit p: Parameters) extends XSModule with FauFTBParams {
+    ...
+  }
+
+  // bank 1 for tage, bank 0 for others
+  val banks = Seq.fill(numDup_local)(Module(new FauFTBBank))
+  banks.foreach(b => dontTouch(b.io))
+  ...
+  banks(0).io.req_tag := getTag(s1_pc_dup(dupForUbtb))
+  banks(1).io.req_tag := getTag(s1_pc_dup(special_idx_for_dup))
+  ...
+  for (b <- 0 until numDup_local) {
+    banks(b).io.update_req_tag := u_s0_tag_dup(b)
+  }
+  ...
+  val u_s1_ftb_entry_dup = us.map(u => RegEnable(u.bits.ftb_entry, u.valid))
+  val u_s1_ways_write_valid_dup = Wire(Vec(numDup_local, Vec(numWays, Bool())))
+  for (b <- 0 until numDup_local) {
+    u_s1_ways_write_valid_dup(b) := VecInit((0 until numWays).map(w => u_s1_write_way_oh_dup(b)(w).asBool && u_s1_valid_dup(b)(w)))
+    for (w <- 0 until numWays) {
+      banks(b).io.write_valid_oh(w) := u_s1_ways_write_valid_dup(b)(w)
+      banks(b).io.write_tag         := u_s1_tag_dup(b)
+      banks(b).io.write_entry       := u_s1_ftb_entry_dup(b)
+    }
+  }
+
+  // update saturating counters
+  val u_s1_br_update_valids_dup = us.zip(u_s0_br_update_valids_dup).map {case (u, bruv) => RegEnable(bruv, u.valid)}
+  val u_s1_br_takens_dup        = us.map(u => RegEnable(u.bits.br_taken_mask,  u.valid))
+  ...
+}
+```
+
+我有一个不成熟的想法: 对 Chisel 的使用如果足够熟练, 是不是就不需要用这么多的 `for` 循环了? 于是我在代码中保留了两段, 以待之后的思考.
+
+这段代码很有意思. 其中有两个内嵌的类定义, 分别为 `FauFTBMeta` 和 `FauFTBBank`. 看起来, 这两个类分别是用来存储元数据和提供通道用的. 这个简易的预测器通过实例化一个元数据和两个通道, 控制其间的逻辑, 不过这些不是重点.
+
+注意到, `FauFTB` 这个模块继承了 `BasePredictor` 作为父类. 这个类是一个抽象类.
+
+```scala
+class BasePredictorIO (implicit p: Parameters) extends XSBundle with HasBPUConst {
+  val in  = Flipped(DecoupledIO(new BasePredictorInput))
+  val out = Output(new BasePredictorOutput)
+
+  val ctrl = Input(new BPUCtrl)
+
+  val s0_fire = Input(Vec(numDup, Bool()))
+  val s1_fire = Input(Vec(numDup, Bool()))
+  val s2_fire = Input(Vec(numDup, Bool()))
+  val s3_fire = Input(Vec(numDup, Bool()))
+
+  val s2_redirect = Input(Vec(numDup, Bool()))
+  val s3_redirect = Input(Vec(numDup, Bool()))
+
+  val s1_ready = Output(Bool())
+  val s2_ready = Output(Bool())
+  val s3_ready = Output(Bool())
+
+  val update = Vec(numDup, Flipped(Valid(new BranchPredictionUpdate)))
+  val redirect = Flipped(Valid(new BranchPredictionRedirect))
+}
+
+abstract class BasePredictor(implicit p: Parameters) extends XSModule
+  with HasBPUConst with BPUUtils with HasPerfEvents {
+  val meta_size = 0
+  val spec_meta_size = 0
+  val is_fast_pred = false
+  val io = IO(new BasePredictorIO())
+  ...
+  val s0_pc_dup   = WireInit(io.in.bits.s0_pc) // fetchIdx(io.f0_pc)
+  val s1_pc_dup   = s0_pc_dup.zip(io.s0_fire).map {case (s0_pc, s0_fire) => RegEnable(s0_pc, resetVector.U, s0_fire)}
+  val s2_pc_dup   = s1_pc_dup.zip(io.s1_fire).map {case (s1_pc, s1_fire) => RegEnable(s1_pc, s1_fire)}
+  val s3_pc_dup   = s2_pc_dup.zip(io.s2_fire).map {case (s2_pc, s2_fire) => RegEnable(s2_pc, s2_fire)}
+  ...
+  val perfEvents: Seq[(String, UInt)] = Seq()
+
+  def getFoldedHistoryInfo: Option[Set[FoldedHistoryInfo]] = None
+}
+```
+
+这个抽象类大致是定义了一个分支预测器应当有的元素, 比如是否很快就能预测出来 (`is_fast_pred`), 输入和输出 (`io`), 过多少拍 (时钟周期) 能够预测出的结果之类的信号, 还有预测的值为多少之类的. 同时, 抽象类也保留了预测器的性能事件的接口. 通过继承这个抽象类, 不同的分支预测器 (包括这里所述的 `uBTB`, 即 `FauFTB` 模块) 能够以更高的相似程度被制造出来.
+
+既然我们已经分析出这个抽象类的功能, 那不妨全局搜索一下它的所有继承关系吧!
+
+### 2.3.2 FakePredictor
+
+```scala
+class FakePredictor(implicit p: Parameters) extends BasePredictor {
+  io.in.ready                 := true.B
+  io.out.last_stage_meta      := 0.U
+  io.out := io.in.bits.resp_in(0)
+}
+
+...
+  val predictors = Module(if (useBPD) new Composer else new FakePredictor)
+```
+
+这个类是在不需要分支预测器的时候使用的. `resp_in` 应该指的是对照的输入. 如果使用它做分支预测, 大概就相当于不对分支做任何预测, 直接猜测接下来要顺序执行下一个地址处的指令. 之前放过 `val predictors` 的代码, 我们此处回过头来再看, 发现: 如果 `useBPD = false` 的话, 实际上是使用了一个 "假的分支预测器" 来进行最朴素的分支预测. ~~这就好比国足马上要踢足球比赛, 你永远赌中国队输球, 虽然很朴素, 但是也不失为一种猜测策略.~~
+
+### 2.3.3 FTB (Fetch Target Buffer)
+
+香山雁栖湖架构的手册中提到, 除了 uBTB 之外的分支预测器都属于 APD (Accurate Predictor, 精确预测器), 耗时都超过一拍. 我简单地拿 FTB 举个例.
+
+```scala
+class FTB(implicit p: Parameters) extends BasePredictor with FTBParams with BPUUtils
+  with HasCircularQueuePtrHelper with HasPerfEvents {
+  override val meta_size = WireInit(0.U.asTypeOf(new FTBMeta)).getWidth
+
+  val ftbAddr = new TableAddr(log2Up(numSets), 1)
+
+  class FTBBank(val numSets: Int, val nWays: Int) extends XSModule with BPUUtils {
+    val io = IO(new Bundle {
+      val s1_fire = Input(Bool())
+
+      // when ftb hit, read_hits.valid is true, and read_hits.bits is OH of hit way
+      // when ftb not hit, read_hits.valid is false, and read_hits is OH of allocWay
+      // val read_hits = Valid(Vec(numWays, Bool()))
+      val req_pc = Flipped(DecoupledIO(UInt(VAddrBits.W)))
+      val read_resp = Output(new FTBEntry)
+      val read_hits = Valid(UInt(log2Ceil(numWays).W))
+
+      val u_req_pc = Flipped(DecoupledIO(UInt(VAddrBits.W)))
+      val update_hits = Valid(UInt(log2Ceil(numWays).W))
+      val update_access = Input(Bool())
+
+      val update_pc = Input(UInt(VAddrBits.W))
+      val update_write_data = Flipped(Valid(new FTBEntryWithTag))
+      val update_write_way = Input(UInt(log2Ceil(numWays).W))
+      val update_write_alloc = Input(Bool())
+    })
+
+    // Extract holdRead logic to fix bug that update read override predict read result
+    val ftb = Module(new SRAMTemplate(new FTBEntryWithTag, set = numSets, way = numWays, shouldReset = true, holdRead = false, singlePort = true))
+    val ftb_r_entries = ftb.io.r.resp.data.map(_.entry)
+
+    val pred_rdata   = HoldUnless(ftb.io.r.resp.data, RegNext(io.req_pc.valid && !io.update_access))
+    ftb.io.r.req.valid := io.req_pc.valid || io.u_req_pc.valid // io.s0_fire
+    ftb.io.r.req.bits.setIdx := Mux(io.u_req_pc.valid, ftbAddr.getIdx(io.u_req_pc.bits), ftbAddr.getIdx(io.req_pc.bits)) // s0_idx
+    ...
+    for (n <- 1 to numWays) {
+      XSPerfAccumulate(f"ftb_pred_${n}_way_hit", PopCount(total_hits) === n.U)
+      XSPerfAccumulate(f"ftb_update_${n}_way_hit", PopCount(u_total_hits) === n.U)
+    }
+
+    val replacer = ReplacementPolicy.fromString(Some("setplru"), numWays, numSets)
+    ...
+  } // FTBBank
+
+  val ftbBank = Module(new FTBBank(numSets, numWays))
+  ...  
+  val s1_ftb_hit = ftbBank.io.read_hits.valid && io.ctrl.btb_enable
+  val s1_uftb_hit_dup = io.in.bits.resp_in(0).s1.full_pred.map(_.hit)
+  val s2_ftb_hit_dup = io.s1_fire.map(f => RegEnable(s1_ftb_hit, f))
+  val s2_uftb_hit_dup =
+    if (EnableFauFTB) {
+      io.s1_fire.zip(s1_uftb_hit_dup).map {case (f, h) => RegEnable(h, f)}
+    } else {
+      s2_ftb_hit_dup
+    }
+  ...
+  for (full_pred & s2_ftb_entry & s2_pc & s1_pc & s1_fire & s2_uftb_full_pred & s2_hit & s2_uftb_hit <-
+    io.out.s2.full_pred zip s2_ftb_entry_dup zip s2_pc_dup zip s1_pc_dup zip io.s1_fire zip s2_uftb_full_pred_dup zip
+    s2_ftb_hit_dup zip s2_uftb_hit_dup) {
+    if (EnableFauFTB) {
+      // use uftb pred when ftb not hit but uftb hit
+      when (!s2_hit && s2_uftb_hit) {
+        full_pred := s2_uftb_full_pred
+      }.otherwise {
+        full_pred.fromFtbEntry(s2_ftb_entry, s2_pc, Some((s1_pc, s1_fire)))
+      }
+    } else {
+      full_pred.fromFtbEntry(s2_ftb_entry, s2_pc, Some((s1_pc, s1_fire)))
+    }
+  }
+  ...
+  override val perfEvents = Seq(
+    ("ftb_commit_hits            ", u.valid  &&  u_meta.hit),
+    ("ftb_commit_misses          ", u.valid  && !u_meta.hit),
+  )
+  generatePerfEvent()
+}
+```
+
+仍旧, 许多代码与我们的主题无关. `FTBBank` 类被嵌在本类中, 也在本类中被实例化成一个对象, 作为参数传入 `Module` 的 `apply` 方法, 然后被 Chisel
+
+`EnableFauFTB` 是另一个参数, 这个参数控制了 `uBTB` 是否被启用. 我很好奇, 是否启用一个模块, 为什么不在外部制定控制策略, 而是需要传入 `FTB` 的内部呢? 考虑到如图代码中所展现的两处出现, 第一处是在给 `s2_uftb_hit_dup`, 它作为参数影响了 `full_pred` 之前的 for 循环, 也影响了第二个 `EnableFauFTB` 的使用处, 其内部对信号线 `BasePredictor` 的赋值. 为了挖掘这根信号线的魅力, 我们继续挖掘源头:
+
+`FTB` 继承了父类 `BasePredictor`, 其内例化了 `BasePredictorIO`, 而这个类又例化了 `BasePredictorInput`. 这都是之前的代码中可以找到的, 如果读者有心, 不妨在本文中进行搜索. 而 `BasePredictorInput` 的定义是这样的:
+
+```scala
+class BasePredictorInput (implicit p: Parameters) extends XSBundle with HasBPUConst {
+  def nInputs = 1
+  val s0_pc = Vec(numDup, UInt(VAddrBits.W))
+  val folded_hist = Vec(numDup, new AllFoldedHistories(foldedGHistInfos))
+  val ghist = UInt(HistoryLength.W)
+  val resp_in = Vec(nInputs, new BranchPredictionResp)
+}
+```
+
+其中例化了 `BranchPredictionResp` 这个类. 这个类的定义如下:
+
+```scala
+@chiselName
+class BranchPredictionResp(implicit p: Parameters) extends XSBundle with HasBPUConst {
+  val s1 = new BranchPredictionBundle
+  val s2 = new BranchPredictionBundle
+  val s3 = new BranchPredictionBundle
+  ...
+}
+```
+
+此中的 `s1/2/3` 在 `FTB` 的代码中是出现过的, 其实引用的就是此处封装的类. 而 `BranchPredictionBundle` 的定义如下:
+
+```scala
+@chiselName
+class BranchPredictionBundle(implicit p: Parameters) extends XSBundle
+  with HasBPUConst with BPUUtils {
+  val pc    = Vec(numDup, UInt(VAddrBits.W))
+  val valid = Vec(numDup, Bool())
+  val full_pred    = Vec(numDup, new FullBranchPrediction)
+  val hasRedirect  = Vec(numDup, Bool())
+  val ftq_idx = new FtqPtr
+  def ...
+  ...
+}
+```
+
+众里寻他千百度, 终于找到 `full_pred` 于此处! 再回头望月, 找到这个共性的根源: `abstract class BasePredictor`. 我们大致可以下定结论: 所有分支预测器的 "完全预测值" (full prediction?), 都是由共同继承的抽象父类提供的. 这个抽象类例化了类A, 类A例化了类B, 类B接着例化了类C, 类C又例化了类D, 这才提供了类D中的某根信号线. 这指出了香山使用抽象类实现分支预测器的一个 "面向对象" 的优势: 通过继承, 使得不同的分支预测器共享相同的一部分代码; 通过例化, 将内部耦合度/相似性较高的代码, 或用处相同的代码单独提取出来, 使代码更加简洁.
+
+但是, 话又说回来, 为什么要在 `FTB` 做输出时考虑 `EnableFauFTB` 这个参数呢? 而不是在顶层模块中选择呢? 注意到 其中判断信号 `!s2_hit && s2_uftb_hit` 中, `s2_uftb_hit` 重命名自 `s2_uftb_hit_dup` 的来源:
+
+```scala
+  val s1_ftb_hit = ftbBank.io.read_hits.valid && io.ctrl.btb_enable
+  val s1_uftb_hit_dup = io.in.bits.resp_in(0).s1.full_pred.map(_.hit)
+  val s2_ftb_hit_dup = io.s1_fire.map(f => RegEnable(s1_ftb_hit, f))
+  val s2_uftb_hit_dup =
+    if (EnableFauFTB) {
+      io.s1_fire.zip(s1_uftb_hit_dup).map {case (f, h) => RegEnable(h, f)}
+    } else {
+      s2_ftb_hit_dup
+    }
+```
+
+嘶, `RegEnable` 是什么?
+
+> `defapply[T <: Data](next: T, init: T, enable: Bool): T`
+> &ensp;&ensp;&ensp;&ensp;Returns a register with the specified next, update enable gate, and reset initialization.
+>
+> `defapply[T <: Data](next: T, enable: Bool): T`
+> &ensp;&ensp;&ensp;&ensp;Returns a register with the specified next, update enable gate, and no reset initialization.[^Chisel3-Regenable]
+
+查询官方手册, 可知这是另一种 "寄存器" 的类型. 所以, 粗略地讲, `s2_uftb_hit_dup` 这个值其实是跟 `s1_uftb_hit_dup` 的有效值基本一致的. 嘶, 看来 `FTB` 模块和 `uFTB` 的关联也十分紧密, 不过谅我能力有限, 暂时还不能理解这个设计的作用. 虽然如此, Chisel 中使用 `if` 会导致电路结构随具体的值不同而变化, 毕竟 `if` 是 Scala 提供的关键字, 而 Scala 的用处是一个 Verilog Generator, 只是为了生成真正的硬件描述语言的代码用的, 这里应见[第1.4.4节](#144-chisel-提供的操作) 内容.
+
+另插一嘴. 我认为, 若是真的存在继承自同一父类的类, 其间硬件逻辑相关的代码有关联, Chisel 应当毫不留情地破坏模块的独立性, 通过一些特殊手段 (如上面给出的 "看起来不怎么面向对象" 的 `EnableFauFTB`) 在模块内部控制代码逻辑的生成, 而非在模块例化之外解决. 这是因为 Chisel 的硬件构造性质, 硬件希望实际产生的电路简洁可靠, 而可以牺牲很多代码的便利性为代价. 硬件工程师常年使用 Verilog 而不觉得其陈旧, 可能这就是其原因之一; 香山的仓库里代码注释很少, 这可能也是因为作者通过严谨的测验确信了硬件的正确无误, 已经完全明白了硬件的结构. 不过, 这一点还是有些不利于开发工作的开展的.
+
+
+
+
+
+
+
+
 
 
 
@@ -1143,3 +1809,5 @@ frontend
 [^XiangShan-intro-zh]: [香山仓库中文介绍](https://github.com/OpenXiangShan/XiangShan/blob/master/readme.zh-cn.md)
 [^香山官方文档-项目导引]: [香山官方文档-项目导引](https://XiangShan-doc.readthedocs.io/zh-cn/latest/guide/)
 [^香山官方文档-分支预测]: [香山官方文档-分支预测](https://xiangshan-doc.readthedocs.io/zh-cn/latest/frontend/bp/)
+[^lowrisc-intro-of-diplomacy]: [第三方使用者对Diplomacy的介绍](https://lowrisc.org/docs/diplomacy/)
+[^Chisel3-Regenable]: [chisel3.util: Regenable](https://javadoc.io/static/edu.berkeley.cs/chisel3_2.12/3.2.1/chisel3/util/RegEnable$.html)
