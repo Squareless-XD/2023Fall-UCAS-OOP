@@ -44,6 +44,12 @@
     - [2.3.1 uBTB (micro Branch Target Buffer)](#231-ubtb-micro-branch-target-buffer)
     - [2.3.2 FakePredictor](#232-fakepredictor)
     - [2.3.3 FTB (Fetch Target Buffer)](#233-ftb-fetch-target-buffer)
+  - [3.1 XiangShan 的高性能分支预测器](#31-xiangshan-的高性能分支预测器)
+    - [3.1.1 XiangShan 的分支预测器性能](#311-xiangshan-的分支预测器性能)
+      - [3.1.1.1 提高分支预测准确性](#3111-提高分支预测准确性)
+      - [3.1.1.2 性能的代价](#3112-性能的代价)
+      - [3.1.1.3 性能的提升方法](#3113-性能的提升方法)
+    - [3.1.2 Xiangshan 的分支预测单元结构](#312-xiangshan-的分支预测单元结构)
 
 ---
 
@@ -1505,7 +1511,7 @@ case class XSCoreParameters
 ){...}
 ```
 
-`Composer` 类混入了特质 `HasBPUConst` (当然其抽象父类 `BasePredictor`也混入了这个特质), 这个特质继承了父特质 `HasXSParameter`. 因此, `Composer` 可以调用其中的 `getBPDComponents` 方法, 以给定参数返回了一个 `coreParams.branchPredictor` 的返回值. 定睛一看, 其返回值是 `(preds, ras.io.out)`. 总之, 这一步获得了分支预测器的组件, 以及 `ras` (Return Adress Stack) 的输出.
+`Composer` 类混入了特质 `HasBPUConst` (当然其抽象父类 `BasePredictor`也混入了这个特质), 这个特质继承了父特质 `HasXSParameter`. 因此, `Composer` 可以调用其中的 `getBPDComponents` 方法, 以给定参数返回了一个 `coreParams.branchPredictor` 的返回值. 定睛一看, 其返回值是 `(preds, ras.io.out)`. 其实再仔细看, 这里可以看到通过柯里化及隐式传递的方法传给分支预测器的 `Parameters` 参数 `p`. 总之, 这一步获得了分支预测器的组件, 以及 `ras` (Return Adress Stack) 的输出.
 
 ### 2.3.1 uBTB (micro Branch Target Buffer)
 
@@ -1785,6 +1791,64 @@ class BranchPredictionBundle(implicit p: Parameters) extends XSBundle
 
 另插一嘴. 我认为, 若是真的存在继承自同一父类的类, 其间硬件逻辑相关的代码有关联, Chisel 应当毫不留情地破坏模块的独立性, 通过一些特殊手段 (如上面给出的 "看起来不怎么面向对象" 的 `EnableFauFTB`) 在模块内部控制代码逻辑的生成, 而非在模块例化之外解决. 这是因为 Chisel 的硬件构造性质, 硬件希望实际产生的电路简洁可靠, 而可以牺牲很多代码的便利性为代价. 硬件工程师常年使用 Verilog 而不觉得其陈旧, 可能这就是其原因之一; 香山的仓库里代码注释很少, 这可能也是因为作者通过严谨的测验确信了硬件的正确无误, 已经完全明白了硬件的结构. 不过, 这一点还是有些不利于开发工作的开展的.
 
+---
+
+![BOSC Logo](./images/BOSC-2.png)
+
+写报告的这一块内容的时候, 我的课堂汇报已经做完了. 在接下来的部分中, 我会将课堂报告与其未涉及到的部分尽量在这里补全, 以便读者对其有更深刻的了解. 另外, 这里的内容还将结合一些更深刻的内容, 其中有些是更与处理器相关的
+
+---
+
+## 3.1 XiangShan 的高性能分支预测器
+
+
+> Branch prediction research is basically about separating easier and more difficult branches, and using a simple predictor for the easy branches and a complex predictor for the difficult ones.
+>
+> — Onur Mutlu (Computer Architecture and Digital Design, ETHZ)
+
+作为一个学术项目, 来自北京开源芯片研究院 (Beijing Institute of Open Source Chip) 香山团队在香山处理器的分支预测器上下了大功夫. 现在主流处理器使用的分支处理器都是经典的 Tage 处理器变种, 香山也不例外. [^现代分支预测]
+
+但是, 考虑到各种复杂因素的影响, 香山正在简化其分支预测器.
+
+### 3.1.1 XiangShan 的分支预测器性能
+
+> 香山处理器的分支预测器也从雁栖湖的 TAGE-SC-L 变成了南湖和昆明湖的 TAGE-SC，然后甚至正在考虑去掉 SC。
+
+分支预测器的预测性能 (准确率), 是计量其能力的重要指标; 然而, 目前工业界使用的分支预测器并不是很先进的成品, 而是较老的 Tage. 因为在处理器整体的思量下, 实现一个复杂的分支预测器有很多弊端, 比如面积/延迟/功耗/内存空间/局部历史保存等等. 所以, 虽然表面上看起来香山的分支预测器使用了更高级的方案, 但是实际制作出来之后, 综合效果未必真的更优.
+
+#### 3.1.1.1 提高分支预测准确性
+
+为了提高准确率, 分支预测器会倾向于采用多种方法同时预测次条指令. 香山亦是如此, 诸多预测单元分别预测1/2/3拍后的可能分支, 并以此为依据预测分支跳转的情况. 不同的分支预测器会返回各种不同的结果, 分支预测单元对它做统一管理, 选择最终的猜测结果.
+
+#### 3.1.1.2 性能的代价
+
+另外, 为了提高分支预测单元的预测命中率, Chisel 的代码中不可避免地会携带大量非面向对象化的电路具体描述内容. 十二月在 Chinasys 听包老师的报告时, 我觉得有一段话讲的很有意思: 采用 Chisel 的面向对象编程也有缺陷: 过高的模块化程度, 虽然设计芯片会像搭乐高一样简单, 但是也有缺点: 搭出来的东西也像搭的乐高一样粗糙.
+
+![面向对象的缺点](./images/xiangshan_report.jpg)
+
+面向对象并非一定能起到良好的作用, 有很多时候你想要的是香蕉, 但是面向对象会给你一只猩猩和一片雨林. 使用面向对象的编程, 尤其是在设计芯片时, 请一定要牢记设计的初衷: 用简单的语法实现相同甚至更好的功能. 如果有的地方, 使用所谓 "便捷" 的高级语法反而会导致难以忽视的性能损失, 那请毫不犹豫地抛弃它. 面向对象的编程方法只是一个工具, 而不是镣铐.
+
+#### 3.1.1.3 性能的提升方法
+
+不过, 面向对象的编程确实有略微的好处: 当你更改一个牵动全局各处的逻辑时, 可能只需要更改微小的一点代码; 模块化的代码块内部也不会牵动全局的改变, 不过这在 Verilog 里也有相应的体现. 如果一直盯着香山仓库 head 分支看的话, 会发现隔一段时间就会有一些代码的 commit, 不少都是出现在单独的模块内部的.
+
+这一点的具体实现方法之前也有提到, 就是我是用单独的实例来承载一个类与另一个类的输入/输出信号线, 这样就能够把它们集中起来. 而不是像 Verilog 一样, 每次修改模块的输入/输出信号, 都需要更改一下其头部的声明.
+
+### 3.1.2 Xiangshan 的分支预测单元结构
+
+这下总该说一下结构了:
+
+![分支预测单元的类继承关系图](./images/OOP香山BPU类图.png)
+
+香山的类继承写得十分混乱, 但是又混乱地可以理解. 下面我把这个类继承关系的简化图略略讲解一下.
+
+首先是最上端的 `Frontend/FrontendImp` 模块, 这我们之前已经说过, 是来自 Diplomacy 的一堆 "单例模式" 类, 会让模块间的互联互通变得更简单. 其下例化了 `Predictor` 对象, 对应 Verilog 代码中整个分支预测单元的顶层模块. 前端除了分支预测单元, 还有诸多其他模块, 如 `Ibuffer` 是指令缓冲区, `Ftq` 是取指目标队列, `NewIFU` 是被香山团队更新过的指令获取队列. 他们都是在 `FrontendImp` 中被例化的, 虽然例化方式可能有不同, 但与其关系一致. `Predictor` 类中, 又有例化了 `Composer` 这个挂载着诸多不同分支预测器的类, 以及用于承载 I/O 信号的 `PredictorIO` 模块, 其中包括了控制信号, 与 FTQ 的信号传递等等. 而 `Composer` 模块内例化了 `FTB` 与诸多其他分支预测器, 每个分支预测器基本都有自己的 Bank, 元数据, 预测结果等信息.
+
+从 `FrontendImp` 开始, 这整个结构对 trait 的重复引用就没少过. 
+
+
+
+
 
 
 
@@ -1811,3 +1875,4 @@ class BranchPredictionBundle(implicit p: Parameters) extends XSBundle
 [^香山官方文档-分支预测]: [香山官方文档-分支预测](https://xiangshan-doc.readthedocs.io/zh-cn/latest/frontend/bp/)
 [^lowrisc-intro-of-diplomacy]: [第三方使用者对Diplomacy的介绍](https://lowrisc.org/docs/diplomacy/)
 [^Chisel3-Regenable]: [chisel3.util: Regenable](https://javadoc.io/static/edu.berkeley.cs/chisel3_2.12/3.2.1/chisel3/util/RegEnable$.html)
+[^现代分支预测]: [现代分支预测：从学术界到工业界](https://blog.eastonman.com/blog/2023/12/modern-branch-prediction-from-academy-to-industry/)
