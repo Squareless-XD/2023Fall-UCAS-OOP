@@ -46,10 +46,15 @@
     - [2.3.3 FTB (Fetch Target Buffer)](#233-ftb-fetch-target-buffer)
   - [3.1 XiangShan 的高性能分支预测器](#31-xiangshan-的高性能分支预测器)
     - [3.1.1 XiangShan 的分支预测器性能](#311-xiangshan-的分支预测器性能)
-      - [3.1.1.1 提高分支预测准确性](#3111-提高分支预测准确性)
-      - [3.1.1.2 性能的代价](#3112-性能的代价)
-      - [3.1.1.3 性能的提升方法](#3113-性能的提升方法)
-    - [3.1.2 Xiangshan 的分支预测单元结构](#312-xiangshan-的分支预测单元结构)
+    - [3.1.2 提高分支预测准确性](#312-提高分支预测准确性)
+    - [3.1.3 性能的代价](#313-性能的代价)
+    - [3.1.4 性能的提升方法](#314-性能的提升方法)
+  - [3.2 Xiangshan 的分支预测单元结构](#32-xiangshan-的分支预测单元结构)
+    - [3.2.1 Xiangshan 的分支预测单元类图](#321-xiangshan-的分支预测单元类图)
+    - [3.2.2 Xiangshan 的分支预测器抽象父类捉虫](#322-xiangshan-的分支预测器抽象父类捉虫)
+    - [3.2.3 Xiangshan 的其他高级设计意图](#323-xiangshan-的其他高级设计意图)
+  - [4.1 结语 1](#41-结语-1)
+  - [4.2 结语 2](#42-结语-2)
 
 ---
 
@@ -1039,13 +1044,13 @@ def getSmallBoats(seq: Seq[Boat]): Seq[Boat] = seq.filter { b =>
 - 开源, 意味着源代码对任何人的开放性, 所有人都可以拿香山的代码流片, 所有人都可以使用它的代码进行使用或更改.
 - RISC-V, 是一个开源开放的指令集, 有短小精悍的优点, 也有拓展与兼容方面的不足. 香山项目的目标是在 RISC-V 这个允许任何人免费实现 CPU 的指令集上, 实现一个能为工业界和学术界广泛使用的开源处理器核.
 
-> 自 2020 年 6 月开始开发的雁栖湖为香山处理器的首个稳定的微架构.   
-> 香山的第二代微架构被命名为南湖.   
+> 自 2020 年 6 月开始开发的雁栖湖为香山处理器的首个稳定的微架构.  
+> 香山的第二代微架构被命名为南湖.  
 > 香山的第三代微架构（昆明湖）正在 master 分支上不断开发中. [^XiangShan-intro-zh]
 
 本文中, 笔者将主要阅读香山仓库南湖架构版本的 RTL 代码, 可能会辅以对 master 分支的部分新增功能的阅读.
 
-> 它的架构代号以湖命名. 第一版架构代号是“雁栖湖”, 这是带有浓重国科大情节的同学们起的名字, 因为他们研一都在怀柔雁栖湖待了一年. “雁栖湖”RTL代码于2021年4月完成, 计划于7月基于28nm工艺流片, 目前频率为1.3GHz.   
+> 它的架构代号以湖命名. 第一版架构代号是“雁栖湖”, 这是带有浓重国科大情节的同学们起的名字, 因为他们研一都在怀柔雁栖湖待了一年. “雁栖湖”RTL代码于2021年4月完成, 计划于7月基于28nm工艺流片, 目前频率为1.3GHz.  
 > 第二版架构代号是“南湖”, 这是向建党100周年致敬. “南湖”计划在今年年底[^今年年底]流片, 将采用14nm工艺, 目标频率是2GHz. [^XiangShan-intro-zhihu]
 
 ### 1.5.2 XiangShan 包含的主要功能模块
@@ -1801,7 +1806,6 @@ class BranchPredictionBundle(implicit p: Parameters) extends XSBundle
 
 ## 3.1 XiangShan 的高性能分支预测器
 
-
 > Branch prediction research is basically about separating easier and more difficult branches, and using a simple predictor for the easy branches and a complex predictor for the difficult ones.
 >
 > — Onur Mutlu (Computer Architecture and Digital Design, ETHZ)
@@ -1816,11 +1820,11 @@ class BranchPredictionBundle(implicit p: Parameters) extends XSBundle
 
 分支预测器的预测性能 (准确率), 是计量其能力的重要指标; 然而, 目前工业界使用的分支预测器并不是很先进的成品, 而是较老的 Tage. 因为在处理器整体的思量下, 实现一个复杂的分支预测器有很多弊端, 比如面积/延迟/功耗/内存空间/局部历史保存等等. 所以, 虽然表面上看起来香山的分支预测器使用了更高级的方案, 但是实际制作出来之后, 综合效果未必真的更优.
 
-#### 3.1.1.1 提高分支预测准确性
+### 3.1.2 提高分支预测准确性
 
 为了提高准确率, 分支预测器会倾向于采用多种方法同时预测次条指令. 香山亦是如此, 诸多预测单元分别预测1/2/3拍后的可能分支, 并以此为依据预测分支跳转的情况. 不同的分支预测器会返回各种不同的结果, 分支预测单元对它做统一管理, 选择最终的猜测结果.
 
-#### 3.1.1.2 性能的代价
+### 3.1.3 性能的代价
 
 另外, 为了提高分支预测单元的预测命中率, Chisel 的代码中不可避免地会携带大量非面向对象化的电路具体描述内容. 十二月在 Chinasys 听包老师的报告时, 我觉得有一段话讲的很有意思: 采用 Chisel 的面向对象编程也有缺陷: 过高的模块化程度, 虽然设计芯片会像搭乐高一样简单, 但是也有缺点: 搭出来的东西也像搭的乐高一样粗糙.
 
@@ -1828,36 +1832,176 @@ class BranchPredictionBundle(implicit p: Parameters) extends XSBundle
 
 面向对象并非一定能起到良好的作用, 有很多时候你想要的是香蕉, 但是面向对象会给你一只猩猩和一片雨林. 使用面向对象的编程, 尤其是在设计芯片时, 请一定要牢记设计的初衷: 用简单的语法实现相同甚至更好的功能. 如果有的地方, 使用所谓 "便捷" 的高级语法反而会导致难以忽视的性能损失, 那请毫不犹豫地抛弃它. 面向对象的编程方法只是一个工具, 而不是镣铐.
 
-#### 3.1.1.3 性能的提升方法
+### 3.1.4 性能的提升方法
 
 不过, 面向对象的编程确实有略微的好处: 当你更改一个牵动全局各处的逻辑时, 可能只需要更改微小的一点代码; 模块化的代码块内部也不会牵动全局的改变, 不过这在 Verilog 里也有相应的体现. 如果一直盯着香山仓库 head 分支看的话, 会发现隔一段时间就会有一些代码的 commit, 不少都是出现在单独的模块内部的.
 
 这一点的具体实现方法之前也有提到, 就是我是用单独的实例来承载一个类与另一个类的输入/输出信号线, 这样就能够把它们集中起来. 而不是像 Verilog 一样, 每次修改模块的输入/输出信号, 都需要更改一下其头部的声明.
 
-### 3.1.2 Xiangshan 的分支预测单元结构
+## 3.2 Xiangshan 的分支预测单元结构
+
+### 3.2.1 Xiangshan 的分支预测单元类图
 
 这下总该说一下结构了:
 
 ![分支预测单元的类继承关系图](./images/OOP香山BPU类图.png)
 
+其中, 上面橙色的 `Frontend` 是前端的类; 其下黄色的是分支预测单元较顶层的模块; 下面浅蓝色的是 `FTB`, 之前提到过的一个分支预测器; 右侧浅绿色的是分支预测器们继承的抽象类 `BasePredictor` 和其组件; 粉色的是各种特质; `XSBundle` 是一个混入了 `HasXSParameter` 的抽象类. 斜体表示的是抽象类, 而字体加粗的都是在香山以外的已有模块.
+
+```scala
+abstract class XSBundle(implicit val p: Parameters) extends Bundle
+  with HasXSParameter
+```
+
 香山的类继承写得十分混乱, 但是又混乱地可以理解. 下面我把这个类继承关系的简化图略略讲解一下.
 
 首先是最上端的 `Frontend/FrontendImp` 模块, 这我们之前已经说过, 是来自 Diplomacy 的一堆 "单例模式" 类, 会让模块间的互联互通变得更简单. 其下例化了 `Predictor` 对象, 对应 Verilog 代码中整个分支预测单元的顶层模块. 前端除了分支预测单元, 还有诸多其他模块, 如 `Ibuffer` 是指令缓冲区, `Ftq` 是取指目标队列, `NewIFU` 是被香山团队更新过的指令获取队列. 他们都是在 `FrontendImp` 中被例化的, 虽然例化方式可能有不同, 但与其关系一致. `Predictor` 类中, 又有例化了 `Composer` 这个挂载着诸多不同分支预测器的类, 以及用于承载 I/O 信号的 `PredictorIO` 模块, 其中包括了控制信号, 与 FTQ 的信号传递等等. 而 `Composer` 模块内例化了 `FTB` 与诸多其他分支预测器, 每个分支预测器基本都有自己的 Bank, 元数据, 预测结果等信息.
 
-从 `FrontendImp` 开始, 这整个结构对 trait 的重复引用就没少过. 
+从 `FrontendImp` 开始, 这整个结构对 trait 的重复引用就没少过, 但是有时候会有一些 (其实并没有问题的) 重复, 比如 `FTB` 及其父类 `BasePredictor` 都混入了特质 `HasPerfEvents` 来统计性能事件, 但是根据类继承性质, 并不会有问题. 这是一些不必要的重复, 会让类图看起来有些混乱. 而且大多数的模块之间都是靠 "例化" 来耦合的, 而不能靠继承关系, 因为继承关系的限制实在是太强了, 不应该经常使用. 他们也会不可避免地使用相同的特质, 除非对代码做重构, 让它们的父类已经混入过一些可以重复使用的特质.
 
+### 3.2.2 Xiangshan 的分支预测器抽象父类捉虫
 
+如同前文所述, 抽象类 `BasePredictor` 是所有分支预测器的共同父类, 但它的代码实际上并不多, 起到了限制分支预测器结构的作用, 这个提取十分符合面向对象的思想. 但是其中有一些混乱的成分存在: 输出线路 `BasePredictorOutput` 以 `BranchPredictionResp` 作为父类, 继承了其中的控制控制信号, 而输入线路 `BasePredictorInput` 直接继承了输出的父类的父类 `XSBundle`, 并不需要这几个信号线. 这一点很奇怪, 我们不妨直接看输出线路的定义:
 
+```scala
+class BasePredictorOutput (implicit p: Parameters) extends BranchPredictionResp {}
+```
 
+看起来它是完全和 `BranchPredictionResp` 相同, 是这个类的重命名. 这个类里定义了:
 
+```scala
+  val s1 = new BranchPredictionBundle
+  val s2 = new BranchPredictionBundle
+  val s3 = new BranchPredictionBundle
 
+  val last_stage_meta = UInt(MaxMetaLength.W)
+  val last_stage_spec_info = new SpeculativeInfo
+  val last_stage_ftb_entry = new FTBEntry
 
+  def selectedRespForFtq ={
+    val res =
+      PriorityMux(Seq(
+        ((s3.valid(dupForFtq) && s3.hasRedirect(dupForFtq)) -> s3),
+        ((s2.valid(dupForFtq) && s2.hasRedirect(dupForFtq)) -> s2),
+        (s1.valid(dupForFtq) -> s1)
+      ))
+    res
+  }
+  def selectedRespIdxForFtq =
+    PriorityMux(Seq(
+      ((s3.valid(dupForFtq) && s3.hasRedirect(dupForFtq)) -> BP_S3),
+      ((s2.valid(dupForFtq) && s2.hasRedirect(dupForFtq)) -> BP_S2),
+      (s1.valid(dupForFtq) -> BP_S1)
+    ))
+  def lastStage = s3
+```
 
+仔细看来, `BranchPredictionBundle` 是分支预测器在三个不同拍上返回的结果, `last_stage_xx` 是控制分支预测器的时间尺度的参数 (比如控制其最晚在几拍后返回结果), `selectedRespForFtq` 是选择结果的方法, 而 `selectedRespIdxForFtq` 是选择预测结果序号的. 而输入线路不同:
 
+```scala
+class BasePredictorInput (implicit p: Parameters) extends XSBundle with HasBPUConst {
+  def nInputs = 1
 
+  val s0_pc = Vec(numDup, UInt(VAddrBits.W))
 
+  val folded_hist = Vec(numDup, new AllFoldedHistories(foldedGHistInfos))
+  val ghist = UInt(HistoryLength.W)
 
+  val resp_in = Vec(nInputs, new BranchPredictionResp)
+}
+```
 
+输入线路定义了不同的一个参数和三组线路 (有三个不同的名字, 暂且理解其为组吧), 并事实上例化了一个 `BranchPredictionResp` 在其中, 不过是以 `Vec` 的形式组织它的. 输入实际上也和这个类有关.
+
+这样看来, 其实是因为 Input 有对 `folded_hist` 和 `ghist` 的需求, 所以途径路径与 Output 不同. 但是我还是很疑惑: 不能让 Output 直接例化一个 `BranchPredictionResp` 吗? 这样处理的话, 类关系会变得很难看, 并且直接用继承的话, 耦合会变强. 不过, 如果现在去更改它的话, 牵动的地方太多, 可能较为困难罢了.
+
+顺带一提, 我到现在都没有理解 `s1/s2/s3` 中的 s 是什么意思.
+
+### 3.2.3 Xiangshan 的其他高级设计意图
+
+下面是几个在汇报时提及的事情, 我在这里简单写一下.
+
+```scala
+// TODO: check target related logics
+@chiselName
+class ITTage(implicit p: Parameters) extends BaseITTage {
+  override val meta_size = 0.U.asTypeOf(new ITTageMeta).getWidt
+  ...
+  override def getFoldedHistoryInfo = Some(tables.map(_.getFoldedHistoryInfo).reduce(_++_))
+  ...
+}
+```
+
+香山的 ITTage 分支预测器实现中, 使用了 `override` 关键字, 重写了来自父类 `BaseITTage` 的父类 `BasePredictor` 中的一个常量和一个方法, 这个之前也略微提及. 但, 这一版香山的 rtl 似乎忘记了清除掉没用的 `BaseITTage` 类中的代码:
+
+```scala
+abstract class BaseITTage(implicit p: Parameters) extends BasePredictor with ITTageParams with BPUUtils {
+  // class TAGEResp {
+  //   val takens = Vec(PredictWidth, Bool())
+  //   val hits = Vec(PredictWidth, Bool())
+  // }
+  // class TAGEMeta {
+  // }
+  // class FromBIM {
+  //   val ctrs = Vec(PredictWidth, UInt(2.W))
+  // }
+  // class TageIO extends DefaultBasePredictorIO {
+  //   val resp = Output(new TAGEResp)
+  //   val meta = Output(Vec(PredictWidth, new TageMeta))
+  //   val bim = Input(new FromBIM)
+  //   val s2Fire = Input(Bool())
+  // }
+
+  // override val io = IO(new TageIO)
+}
+```
+
+所以实际上这个抽象类只被用类混入了几个特质.
+
+```scala
+trait BPUUtils extends HasXSParameter {
+  def circularShiftLeft(source: UInt, len: Int, shamt: UInt): UInt = { ... }
+  def circularShiftRight(source: UInt, len: Int, shamt: UInt): UInt = { ... }
+  def satUpdate(old: UInt, len: Int, taken: Bool): UInt = { ... }
+  def signedSatUpdate(old: SInt, len: Int, taken: Bool): SInt = { ... }
+  def getFallThroughAddr(start: UInt, carry: Bool, pft: UInt) = { ... }
+  def foldTag(tag: UInt, l: Int): UInt = { ... }
+}
+
+...
+
+trait HasBPUConst extends HasXSParameter {
+  val MaxMetaLength = if (!env.FPGAPlatform) 512 else 256 // TODO: Reduce meta length
+  val MaxBasicBlockSize = 32
+  val LHistoryLength = 32
+  // val numBr = 2
+  val useBPD = true // use branch prediction
+  val useLHist = true
+  val numBrSlot = numBr-1
+  val totalSlot = numBrSlot + 1
+  val numDup = 5
+  def dupForFtq = numDup - 1
+  def dupForFtb = 0
+  def dupForTageSC = 1
+  def dupForUbtb = 2
+  def dupForIttage = 3
+  def dupForRas = 2
+
+  ...
+}
+```
+
+`BPUUtils` 使用 `trait` 封装固定的电路功能, `HasBPUConst` 使用 `trait` 封装电路设计参数. 这些是特制的用处.
+
+---
+
+## 4.1 结语 1
+
+写了这么多, 我想的其实还是为了自己. 权当是自己阅读的记录了吧.
+
+## 4.2 结语 2
+
+写到这里, 我人在马尼拉的机场坐着. 已经有点累了. 这学期的最后阶段, 我一直在高强度处理各种课程任务, 间杂着准备春季访学; 期末考试后, 还是事情不断, 到现在还有一个课的任务没有完全完成, 访学的学期就要开始上课了. 虽然我好想多写很多东西, 但是感觉还是力不从心, 于是就到此为止了吧.
 
 [^chisel]: [chisel 的开源代码](https://github.com/chipsalliance/chisel)
 [^firrtl]: [firrtl 的开源代码](https://github.com/chipsalliance/firrtl)
